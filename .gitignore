@@ -1,1 +1,14 @@
-@
+# MATLAB temp/autosaves
+*.asv
+*.m~
+*.mex*
+*.autosave
+
+# OS junk
+Thumbs.db
+.DS_Store
+
+# (optional) outputs
+results/
+output/
+figures/
