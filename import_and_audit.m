@@ -4,14 +4,14 @@
 
 % krigolson-dataset
 
-% Per-run inputs (robust to "01" vs "sub-01")
+% Per-run inputs 
 sub_in = strtrim(input('Enter subject ID (e.g., sub-01 OR 01): ','s'));
 if isempty(sub_in), error('Subject ID cannot be empty.'); end
 if startsWith(sub_in, 'sub-')
     sub = sub_in;
 else
-    num = regexprep(sub_in, '^\D+', ''); % strip any leading non-digits
-    if isempty(num), error('Subject ID must be like "sub-01" or a number like "01".'); end
+    num = regexprep(sub_in, '^\D+', ''); 
+    if isempty(num), error('Subject ID ("sub-01" or "01"):'); end
     sub = sprintf('sub-%s', num);
 end
 
@@ -19,7 +19,7 @@ task = strtrim(input('Enter task name (e.g., CogAss1): ','s'));
 if isempty(task), error('Task name cannot be empty.'); end
 
 % Project-level settings
-pipeline = 'eeglab_ICA-pipeline';  % <-- renamed per request
+pipeline = 'eeglab_ICA-pipeline';  
 root     = getProjectRootSimple();
 addpath(fullfile(root,'code',pipeline));
 
@@ -32,7 +32,7 @@ derivRoot  = fullfile(root, 'derivatives');  ensure_dir(derivRoot);
 pipelineDir = fullfile(derivRoot, pipeline); ensure_dir(pipelineDir);
 makeDerivativeDescription(pipelineDir);
 
-datasetDir  = fullfile(pipelineDir, sub, 'eeg');  % <root>/derivatives/pipeline/sub-XX/eeg
+datasetDir  = fullfile(pipelineDir, sub, 'eeg');  
 ensure_dir(datasetDir);
 
 % Subfolders used by this script
@@ -80,13 +80,13 @@ locFile = fullfile(root, 'sourcedata', 'Standard-10-20-Cap81.ced');
 if ~isempty(vhdrPath)
     fprintf('Importing BrainVision: %s\n', vhdrPath);
     [vhdrFolder, vhdrName, vhdrExt] = fileparts(vhdrPath);
-    EEG = pop_loadbv(vhdrFolder, [vhdrName vhdrExt]);   % <- folder + filename
+    EEG = pop_loadbv(vhdrFolder, [vhdrName vhdrExt]);   
     EEG = eeg_checkset(EEG);
 
 elseif ~isempty(setPath)
     fprintf('Importing EEGLAB .set: %s\n', setPath);
     [setFolder, setName, setExt] = fileparts(setPath);
-    EEG = pop_loadset('filename', [setName setExt], 'filepath', setFolder); % <- split path
+    EEG = pop_loadset('filename', [setName setExt], 'filepath', setFolder); 
     EEG = eeg_checkset(EEG);
 
 elseif ~isempty(matPath)
@@ -97,7 +97,7 @@ elseif ~isempty(matPath)
 elseif ~isempty(edfPath)
     fprintf('Importing EDF: %s\n', edfPath);
     try
-        EEG = pop_biosig(edfPath);  % full path is fine here
+        EEG = pop_biosig(edfPath);
         EEG = eeg_checkset(EEG);
     catch ME
         error(['EDF import requires BIOSIG in path. Original error: ' ME.message]);
@@ -107,7 +107,7 @@ else
 end
 
 
-% Attach/lookup channel locations if needed
+% Attach/lookup channel locations 
 needsLocs = (~isfield(EEG, 'chanlocs') || isempty(EEG.chanlocs) || ...
              all(arrayfun(@(c) isempty(c.X) || isempty(c.Y) || isempty(c.Z), EEG.chanlocs)));
 if needsLocs && exist(locFile,'file')==2
@@ -115,7 +115,7 @@ if needsLocs && exist(locFile,'file')==2
     EEG = eeg_checkset(EEG);
 end
 
-% Save WITH coords (or best effort)
+% Save 
 pop_saveset(EEG, 'filename', rawimportName, 'filepath', datasetDir);
 
 
@@ -159,7 +159,7 @@ fprintf(fid, '- Duplicate labels: %s\n', string(hasDup));
 hasXYZ = arrayfun(@(c) ~isempty(c.X) && ~isempty(c.Y) && ~isempty(c.Z), EEG.chanlocs);
 fprintf(fid, '- Channels with 3D coords: %d/%d\n', sum(hasXYZ), EEG.nbchan);
 
-% 2D layout figure (save to figs/, link from log/ with ../figs/)
+% 2D layout figure 
 layoutName = sprintf('%s_layout2D.png', fileBase);
 fig1       = fullfile(figsDir, layoutName);
 figure('Visible','off');

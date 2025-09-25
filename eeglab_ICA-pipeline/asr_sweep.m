@@ -1,25 +1,9 @@
 function [EEG, T] = bad_channel_triage(EEG, logFile, saveSet, stem, logMsg)
-% BAD_CHANNEL_TRIAGE  Interactive clean_rawdata triage + diagnostics + removal UI.
-%
-% Usage:
-%   [EEG, T] = bad_channel_triage(EEG, logFile, saveSet, stem, logMsg)
-%
-% Inputs:
-%   EEG      : EEGLAB dataset (pre-removal).
-%   logFile  : full path to preprocessing_log.md.
-%   saveSet  : function handle, e.g. @(desc,EEG) pop_saveset(EEG,...)
-%   stem     : filename stem for saves (e.g., 'sub-01_task-XYZ').
-%   logMsg   : (optional) logger handle; if empty, internal logging to logFile only.
-%
-% Outputs:
-%   EEG      : possibly updated dataset after user choices.
-%   T        : table of diagnostics and suggestions for the flagged channels.
-%
-% NOTE: This file is delivered in 2 parts. This is PART 1 (setup, triage, diagnostics,
-%       evidence table, logging, raw viewer). PART 2 contains the interactive choice,
-%       removal, coordinate restore, final logging, and subfunctions.
 
-% ---------------------- Fallback logger -----------------------------------
+% BAD_CHANNEL_TRIAGE: Interactive clean_rawdata triage + diagnostics + removal UI.
+
+% Fallback logger
+
 if nargin < 5 || isempty(logMsg)
     fidLM = fopen(logFile,'a');
     logMsg = @(varargin) fprintf(fidLM, '%s\n', sprintf(varargin{:}));
@@ -34,7 +18,7 @@ EEG0    = EEG;
 labels0 = {EEG0.chanlocs.labels};
 fs      = EEG0.srate;
 
-% ---------------------- Settings ------------------------------------------
+% Settings
 thresholds    = [0.85 0.80 0.75];   % channel-corr sweep
 hfSD          = 4;                  % High-freq noise SD (clean_rawdata)
 flatlineSec   = 5;                  % Dead flatline threshold (s)
@@ -55,7 +39,7 @@ lfBand        = [0.1 2];            % Hz
 lfZ_high      = +3;                 % robust z high LF
 blink_r_high  = 0.50;               % strong blink coupling
 
-% ---------------------- Dry-run triage (no changes) -----------------------
+% Dry-run triage (no changes)
 flaggedUnion = {};
 trialSumm = struct('thr',{},'removed',{});
 
@@ -96,13 +80,13 @@ if isempty(flaggedUnion)
     return;
 end
 
-% ---------------------- Diagnostics on flagged set ------------------------
-X = double(EEG0.data);            % [nCh x nSamp]
+% Diagnostics on flagged set
+X = double(EEG0.data);         
 nSamp = size(X,2);
 
-% ---- Dead-channel diagnostic
+% Dead-channel diagnostic
 chStd  = std(X, 0, 2);
-refStd = median(chStd(chStd > 0));          % robust reference
+refStd = median(chStd(chStd > 0));         
 flatThreshSmp = round(flatlineSec * fs);
 
 deadResults = table('Size',[numel(flaggedUnion) 7], ...
@@ -134,12 +118,12 @@ for i = 1:numel(flaggedUnion)
     deadResults(i,:) = {string(lab), isDead, nFlat, flatSecs, s, sFrac, clipPct};
 end
 
-% ---- Noisy-but-not-dead: HF power z, neighbor corr, bridging
+% Noisy-but-not-dead: HF power z, neighbor corr, bridging
 win = min(4*fs, floor(nSamp/8)); win = max(win, 2*fs);
 noverlap = floor(win/2);
 nfft = max(2^nextpow2(win), win);
-[pxx,f] = pwelch(X', win, noverlap, nfft, fs);   % [nFreq x nCh]
-pxx = pxx';                                      % [nCh x nFreq]
+[pxx,f] = pwelch(X', win, noverlap, nfft, fs); 
+pxx = pxx';                                    
 
 hfMask = f >= hfBand(1) & f <= hfBand(2);
 hfPow  = trapz(f(hfMask), pxx(:,hfMask), 2);
@@ -163,7 +147,7 @@ for c = 1:EEG0.nbchan
         [~,ord] = sort(d, 'ascend');
         neighIdx = ord(2:min(neigh_k+1, EEG0.nbchan));
     else
-        neighIdx = setdiff(1:EEG0.nbchan, c); % fall back: all others
+        neighIdx = setdiff(1:EEG0.nbchan, c); 
     end
     y = mean(X(neighIdx,:),1);
     rs = [];
@@ -171,7 +155,7 @@ for c = 1:EEG0.nbchan
         xi = x(s:s+winS-1); yi = y(s:s+winS-1);
         if std(xi)>0 && std(yi)>0
             r = corr(xi', yi');
-            if ~isnan(r), rs(end+1) = r; end %#ok<AGROW>
+            if ~isnan(r), rs(end+1) = r; end 
         end
     end
     if ~isempty(rs)
@@ -184,7 +168,7 @@ if ~isempty(pos)
     D = squareform(pdist(pos));
     for c = 1:EEG0.nbchan
         [~,ord] = sort(D(c,:),'ascend');
-        nb = ord(find(ord~=c,1));        % nearest distinct neighbor
+        nb = ord(find(ord~=c,1));       
         diffSig = X(c,:) - X(nb,:);
         bridgeRatio(c) = var(diffSig) / max(var(X(c,:)), eps);
     end
@@ -200,7 +184,7 @@ for i = 1:numel(flaggedUnion)
     noisyResults(i,:) = {string(flaggedUnion{i}), hfZ(ci), neighMedR(ci), br};
 end
 
-% ---- Ocular / slow drift
+% Ocular / slow drift
 lfMask = f >= lfBand(1) & f <= lfBand(2);
 lfPow  = trapz(f(lfMask), pxx(:,lfMask), 2);
 lfZ    = (lfPow - median(lfPow)) ./ mad(lfPow, 1);
@@ -230,7 +214,7 @@ for c = 1:EEG0.nbchan
     for s = 1:stepS:(nSamp - winS + 1)
         xi = x(s:s+winS-1); yi = eogBL(s:s+winS-1);
         if std(xi)>0 && std(yi)>0
-            r = corr(xi', yi'); if ~isnan(r), rs(end+1)=r; end %#ok<AGROW>
+            r = corr(xi', yi'); if ~isnan(r), rs(end+1)=r; end 
         end
     end
     if ~isempty(rs), blinkMedR(c) = median(rs); end
@@ -245,7 +229,7 @@ for i = 1:numel(flaggedUnion)
     ocularResults(i,:) = {string(flaggedUnion{i}), lfZ(ci), blinkMedR(ci)};
 end
 
-% ---------------------- Summarize & suggestions ---------------------------
+% Summarize and provide suggestions
 T = outerjoin(deadResults, noisyResults, 'Keys','Label','MergeKeys',true);
 T = outerjoin(T, ocularResults, 'Keys','Label','MergeKeys',true);
 
@@ -269,7 +253,7 @@ fprintf('\n=== Flagged channel evidence ==================================\n');
 printTable(T(:, {'Label','IsDead','StdFrac','ClipPct','HFz_70_120', ...
                  'NeighMedR','BridgeRatio','LFz_0_1_2','BlinkMedR','Suggestion'}));
 
-% ---------------------- Log diagnostics (markdown) ------------------------
+% Log diagnostics
 ts = datestr(now,'yyyy-mm-dd HH:MM:SS');
 fid = fopen(logFile,'a');
 fprintf(fid, "### Bad-channel diagnostics — %s\n", ts);
@@ -290,16 +274,16 @@ end
 fprintf(fid, '\n');
 fclose(fid);
 
-% ---------------------- Open full raw viewer (blocking) -------------------
+% Open full raw viewer 
 viewer_opened = false;
 try
     fprintf('\nOpening raw viewer for ALL channels...\n');
     eegplot(EEG0.data, ...
         'srate', EEG0.srate, ...
         'eloc_file', EEG0.chanlocs, ...
-        'winlength', 8, ...                     % seconds per window
-        'dispchans', min(32, EEG0.nbchan), ...  % channels visible at once
-        'spacing', 50, ...                      % µV vertical spacing
+        'winlength', 8, ...                     
+        'dispchans', min(32, EEG0.nbchan), ...  
+        'spacing', 50, ...                      
         'title', sprintf('Raw data: %s', EEG0.setname));
     viewer_opened = true;
     input('Close the viewer window, then press ENTER to continue...','s');
@@ -307,20 +291,16 @@ catch ME
     warning('Could not open eegplot: %s', ME.message);
 end
 
-% Store whether the viewer opened (more metadata added in Part 2)
-if ~isfield(EEG,'etc') || ~isstruct(EEG.etc), EEG.etc = struct; end
-if ~isfield(EEG.etc,'preICA') || ~isstruct(EEG.etc.preICA), EEG.etc.preICA = struct; end
-EEG.etc.preICA.viewer_opened = viewer_opened;
 
-% ---------------------- (PART 2 starts after this line) -------------------
-% In Part 2:
+
+% PART 2:
 %  - Show the selection menu (or free-form label entry)
 %  - Parse numeric choice or labels
 %  - Apply removal, restore coordinates, save checkpoint
 %  - Final logging, metadata, and helper subfunctions
 
 
-% ---------------------- 7e) Interactive user choice -----------------------
+% Interactive user choice
 fprintf('\n=== Selection menu =============================================\n');
 fprintf('Options:\n');
 fprintf('  [1] Remove only channels suggested as "REMOVE: dead"\n');
@@ -403,7 +383,7 @@ else
     logMsg('- Removed (%d): %s', numel(labels_remove), joinStrings(labels_remove));
     logMsg('- Saved as: %s_desc-%s_eeg.set', stem, tag);
 
-    % Final log block to markdown file (nice summary)
+    % Final log block / summary
     try
         fid = fopen(logFile,'a');
         ts  = datestr(now,'yyyy-mm-dd HH:MM:SS');
@@ -425,7 +405,6 @@ else
         fprintf(fid, "- Saved as: %s_desc-%s_eeg.set\n\n", stem, tag);
         fclose(fid);
     catch
-        % fail silently on log write
     end
 end
 
@@ -433,7 +412,7 @@ end
 if ~isfield(EEG,'etc') || ~isstruct(EEG.etc), EEG.etc = struct; end
 if ~isfield(EEG.etc,'preICA') || ~isstruct(EEG.etc.preICA), EEG.etc.preICA = struct; end
 
-EEG.etc.preICA.flagged_union = flaggedUnion(:)';        % triage union
+EEG.etc.preICA.flagged_union = flaggedUnion(:)';     
 if exist('labels_remove','var'), EEG.etc.preICA.removed_preICA = labels_remove(:)'; else, EEG.etc.preICA.removed_preICA = {}; end
 EEG.etc.preICA.decision_time = datestr(now,'yyyy-mm-dd HH:MM:SS');
 EEG.etc.preICA.triage_params = struct( ...

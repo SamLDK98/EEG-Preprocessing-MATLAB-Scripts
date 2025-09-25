@@ -1,22 +1,6 @@
 function [EEG, R] = asr_interactive(EEG_in, saveSet, stem, logMsg, bc_list, zCut)
-% ASR_INTERACTIVE  Sweep ASR thresholds, summarize, and let user choose.
-%
-% Usage:
-%   [EEG, R] = asr_interactive(EEG, saveSet, stem, logMsg)
-%   [EEG, R] = asr_interactive(EEG, saveSet, stem, logMsg, bc_list, zCut)
-%
-% Inputs:
-%   EEG_in   : EEGLAB dataset before ASR.
-%   saveSet  : function handle, e.g. @(desc,EEG) pop_saveset(EEG, ...).
-%   stem     : filename stem (e.g., 'sub-01_task-XYZ').
-%   logMsg   : logger handle like @(fmt,varargin) fprintf(fid,fmt,varargin{:})
-%              (if empty or missing, logging is skipped safely).
-%   bc_list  : vector of BurstCriterion values to try (default [30 25 20 15 12]).
-%   zCut     : robust z threshold for "heavily changed" samples (default 3).
-%
-% Outputs:
-%   EEG      : dataset after applying the chosen ASR setting.
-%   R        : struct array with results for each bc (EEG, repair_frac, etc).
+
+% ASR_INTERACTIVE: Sweep ASR thresholds, summarize, and let user choose.
 
     if nargin < 6 || isempty(zCut),    zCut = 3; end
     if nargin < 5 || isempty(bc_list), bc_list = [30 25 20 15 12]; end

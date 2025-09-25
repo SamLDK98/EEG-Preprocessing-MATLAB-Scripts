@@ -1,23 +1,21 @@
 %% ========================================================================
-%% ERP branch: attach ICA weights to non-aggressive seed (with logging)
-%% Seed: *_desc-linrmXX_eeg.set  (from ICA branch)
-%% Saves output + log to ERP derivatives folder
+%%                           ERP branch
 %% ========================================================================
 
-% ---- User inputs (fresh) ----
+% User inputs
 sub  = strtrim(input('Enter subject ID (e.g., sub-01): ','s'));
 task = strtrim(input('Enter task name (e.g., CogAss1): ','s'));
 stem = sprintf('%s_task-%s', sub, task);
 
-% ---- Fixed ERP derivatives root (edit if needed) ----
+% ERP derivatives root
 erpDerivRoot = 'C:\Users\samki\Documents\EEG-datasets\krigolson-data\derivatives\eeglab_ERP-pipeline';
 derivName    = 'eeglab_ERP-pipeline';   % for log header
 
-% Derive the *ICA* derivatives root from the ERP root's parent \derivatives\
+% Derive the ICA derivatives root from the ERP root's parent \derivatives\
 [derivParent, ~, ~] = fileparts(erpDerivRoot);                 % ...\derivatives
 icaDerivRoot = fullfile(derivParent, 'eeglab-ICA_pipeline');   % ICA branch name
 
-% ---- Paths (source = ICA; destination = ERP) ----
+% Paths
 srcDatasetDir = fullfile(icaDerivRoot, sub, 'eeg');   % read from here
 erpDatasetDir = fullfile(erpDerivRoot, sub, 'eeg');   % save to here
 figsdir_erp   = fullfile(erpDatasetDir, 'figs');
@@ -27,10 +25,9 @@ if ~exist(erpDatasetDir,'dir'), mkdir(erpDatasetDir); end
 if ~exist(figsdir_erp,'dir'),   mkdir(figsdir_erp);   end
 if ~exist(logdir_erp,'dir'),    mkdir(logdir_erp);    end
 
-% ---- ERP log: create header if missing, then open for append ----
+% ERP log
 logPath_erp = fullfile(logdir_erp, 'preprocessing_log.md');
 
-% % ERP log header (if new)
 if ~exist(logPath_erp,'file')
     fid0 = fopen(logPath_erp,'w');
     ts0  = datestr(now,'yyyy-mm-dd HH:MM:SS');
@@ -53,14 +50,15 @@ logMsg('- Task: %s', task);
 logMsg('- Source (ICA) dir: %s', srcDatasetDir);
 logMsg('- Dest (ERP) dir: %s', erpDatasetDir);
 
-% ---- Non-EEG labels for avg-ref exclusion (must match ICA branch) ----
+% Non-EEG labels for avg-ref exclusion
 nonEEG_labels = upper(string( ...
     {'HEOG','VEOG','EOG','HEOG1','HEOG2','VEOG1','VEOG2', ...
      'EMG','EMG1','EMG2','ECG','M1','M2','A1','A2'}));
 
 try
+
     % --------------------------------------------------------------------
-    % 1) Load ERP seed (desc-linrm50/60) FROM ICA branch
+    % 1) Load ERP seed (desc-linrm50/60) from ICA branch
     % --------------------------------------------------------------------
     candidates = { ...
         sprintf('%s_desc-linrm50_eeg.set', stem), ...
@@ -81,7 +79,7 @@ try
     logMsg('- srate: %.3f Hz; chans: %d; range: [%.3f %.3f] s', EEG.srate, EEG.nbchan, EEG.xmin, EEG.xmax);
 
     % --------------------------------------------------------------------
-    % 2) Load ICA owner (frozen weights dataset) FROM ICA branch
+    % 2) Load ICA owner (frozen weights dataset) 
     % --------------------------------------------------------------------
     ownerFile = sprintf('%s_desc-icaMODEL_eeg.set', stem);
     assert(exist(fullfile(srcDatasetDir, ownerFile),'file')==2, ...
@@ -102,7 +100,7 @@ try
     logMsg('- srate: %.3f Hz; chans: %d; ref: %s', EEG_owner.srate, EEG_owner.nbchan, ownerRefStr);
 
     % --------------------------------------------------------------------
-    % 3) Match channels: drop extras; reorder to match owner (no interp yet)
+    % 3) Match channels: drop extras; reorder to match owner 
     % --------------------------------------------------------------------
     labs_erp   = upper(string({EEG.chanlocs.labels}));
     labs_owner = upper(string({EEG_owner.chanlocs.labels}));
@@ -129,7 +127,7 @@ try
     logMsg('- Matched labels/order to owner (%d channels).', EEG.nbchan);
 
     % --------------------------------------------------------------------
-    % 4) Apply SAME reference as owner (required for valid transfer)
+    % 4) Apply the same reference as owner 
     % --------------------------------------------------------------------
     if isfield(EEG_owner,'ref') && ~isempty(EEG_owner.ref) && ...
             (ischar(EEG_owner.ref) || isstring(EEG_owner.ref)) && strcmpi(EEG_owner.ref,'average')
@@ -196,7 +194,7 @@ try
     logMsg('- Weights: %dx%d (W), sphere: %dx%d', size(EEG.icaweights), size(EEG.icasphere));
 
     % --------------------------------------------------------------------
-    % 7) Save checkpoint to ERP derivatives folder (no ERP filtering yet)
+    % 7) Save checkpoint to ERP derivatives folder 
     % --------------------------------------------------------------------
     outName = sprintf('%s_desc-erpAttach_eeg.set', stem);
     EEG = pop_saveset(EEG, 'filename', outName, 'filepath', erpDatasetDir);
@@ -220,14 +218,14 @@ end
 fclose(fid);
 
 
-%% ----- choose spectrum range (up to 120 Hz, but <= Nyquist) -----
+%% choose spectrum range (up to 120 Hz, but <= Nyquist) 
 nyq   = EEG.srate/2;
-fMax  = min(120, floor(nyq) - 1);            % cap at 120; stay < Nyquist
+fMax  = min(120, floor(nyq) - 1);            
 if fMax < 60, fMax = max(10, floor(nyq)-1); end
 freqRange = [1 fMax];
 
 %% ------------------------------------------------------------------------
-%% Review only the "To Consider" ICs (sorted by suspicion) — robust version
+%% Review only the "To Consider" ICs (sorted by suspicion) 
 %% ------------------------------------------------------------------------
 
 if isempty(idxConsider)
@@ -247,7 +245,7 @@ else
         EEG = eeg_checkset(EEG, 'ica');  % compute icawinv from weights/sphere if needed
     end
 
-    % Drop any ICs with invalid maps (NaNs or wrong length)
+    % Drop any ICs with invalid maps 
     validIC = find(all(isfinite(EEG.icawinv),1));
     idxConsiderValid = intersect(idxConsiderSorted, validIC);
     dropped = setdiff(idxConsiderSorted, idxConsiderValid);
@@ -273,7 +271,7 @@ else
         try
             fprintf('Opening pop_viewprops for %d "To Consider" IC(s) with freqrange [%g %g] Hz...\n', ...
                     numel(idxConsiderValid), freqRange(1), freqRange(2));
-            pop_viewprops(EEG, 0, idxConsiderValid, {'freqrange', freqRange});  % shows ICLabel bars if plugin present
+            pop_viewprops(EEG, 0, idxConsiderValid, {'freqrange', freqRange});  
         catch ME
             fprintf('pop_viewprops failed (%s). Falling back to pop_prop...\n', ME.message);
             for k = idxConsiderValid(:)'
@@ -297,14 +295,12 @@ else
 end
 
 %% ------------------------------------------------------------------------
-%% EXTRA: open a scrollable time-series viewer of ALL IC activations
+%% Open a scrollable time-series viewer of all IC activations
 %% ------------------------------------------------------------------------
 try
-    % pop_eegplot with 'icacomp'=1 shows component activations
     fprintf('Opening IC activations (time series) for ALL ICs...\n');
-    pop_eegplot(EEG, 0, 1, 0);  % icacomp=1
+    pop_eegplot(EEG, 0, 1, 0); 
 catch
-    % Fallback using eegplot on ICA activations
     try
         act = eeg_getica(EEG);  % computes ICA activations if needed
         eegplot(act, 'srate', EEG.srate, ...
@@ -316,7 +312,7 @@ catch
 end
 
 %% ------------------------------------------------------------------------
-%% EXTRA: topomap grid with ICLabel percentages (Consider set; else all ICs)
+%% Topomap grid with ICLabel percentages
 %% ------------------------------------------------------------------------
 if ~exist('idxConsiderValid','var') || isempty(idxConsiderValid)
     showSet = 1:size(P,1);     % fall back to all
@@ -338,13 +334,11 @@ for ii = 1:nShow
         topoplot(EEG.icawinv(:,c), EEG.chanlocs, 'electrodes','on', 'numcontour',5, ...
                  'emarker',{'.','k',7,1});
     catch
-        % If icawinv/chanlocs mismatch, skip
         axis off
         title(sprintf('IC%d (map err)', c), 'FontSize',8);
         continue
     end
-    % Short ICLabel label string for the title
-    pr = 100 * P(c,:);  % percentages
+    pr = 100 * P(c,:);  
     ttl = sprintf('IC%d  Br%2.0f Ey%2.0f Mu%2.0f He%2.0f Ln%2.0f Ch%2.0f O%2.0f', ...
                   c, pr(iBrain), pr(iEye), pr(iMuscle), pr(iHeart), pr(iLine), pr(iChNoise), pr(iOther));
     title(ttl, 'FontSize',8);
